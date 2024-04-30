@@ -1,0 +1,11 @@
+setup.py
+fro/__init__.py
+fro/frak.py
+fro/get_equilibrium.py
+fro/get_ne_prof.py
+fro/try.py
+fro.egg-info/PKG-INFO
+fro.egg-info/SOURCES.txt
+fro.egg-info/dependency_links.txt
+fro.egg-info/entry_points.txt
+fro.egg-info/top_level.txt
