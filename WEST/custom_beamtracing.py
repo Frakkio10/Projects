@@ -17,11 +17,11 @@ from scipy.io import loadmat
 gnr_path_btr = "/Home/difdop/DBSdata/processed/beamtracing/west/{}_FO/ch{}_modex{}_isweep{}_{}_dr{}.mat"
 LV_beamtr_gnr = '/Home/difdop/WEST_traceray_2022/{}/{}WEST_{}_reflecto_{}_freq_all_dr{}.mat'
 
-#%%
+
 def plot_density(nprof, data):    
     fig, ax = plt.subplots(1, 2, figsize = (10, 4))
-    ax[0].plot(nprof.R + nprof.Rshift, nprof.ne*1e-19, 'silver', lw = 0.5)
-    ax[0].plot(data['R'] + nprof.Rshift, data['ne_int']*1e-19, 'r')
+    ax[0].plot(nprof.R + nprof.drho, nprof.ne*1e-19, 'silver', lw = 0.5)
+    ax[0].plot(data['R'] + nprof.drho, data['ne_int']*1e-19, 'r')
     ax[0].set_xlabel('R [m]')
     ax[0].set_ylabel(r'$n_e$ [$10^{19}$ $m^{-3}$]')
     ax[1].plot(data['rho_psi'], data['ne']*1e-19, 'r')
@@ -29,16 +29,18 @@ def plot_density(nprof, data):
     ax[1].set_ylabel(r'$n_e$ [$10^{19}$ $m^{-3}$]')
     plt.show()
 
-def custom_beam3d(machine, shot, isweep, Rshift, twindow, modex, channelval, flag, angle_choice, verbose = True):
+def custom_beam3d(machine, shot, isweep, drho, twindow, modex, channelval, flag, angle_choice, verbose = True):
     
-    filename = gnr_path_btr.format(shot, channelval, modex, isweep, angle_choice,  str(Rshift).split('.')[1])
+    filename = gnr_path_btr.format(shot, channelval, modex, isweep, angle_choice,  str(drho).split('.')[1])
 
 
     #get density profiles and prepare the construct
     print('Retrieving Density Data from DREFRAP')
-    nprof = DREFRAP(shot, flag, Rshift, twindow = twindow, verbose = True)
+    nprof = DREFRAP(shot, flag, drho, twindow = twindow, verbose = True)
+
+
     data = nprof.get_ne(verbose=False, averaged=True)
-    densityprof = DensityProf1d(data['rho_psi'], data['ne'], data['rshift'], data['ne_max'], data['R_max'], 'west', shot, twindow, description = data['header'])
+    densityprof = DensityProf1d(data['rho_psi'], data['ne'], data['drho'], data['ne_max'], data['R_max'], 'west', shot, twindow, description = data['header'])
     plot_density(nprof, data)
     
     #reading density from LV beamtracing 
@@ -83,7 +85,7 @@ def custom_beam3d(machine, shot, isweep, Rshift, twindow, modex, channelval, fla
     #create the path to save the date
     #outpath = defs.get_path_for('beam3d_output', machine=machine,
                             #shot=shot, xmode=modex,channelval=channelval, isweep=dataI.isweep)
-    outpath = gnr_path_btr.format(shot, channelval, modex, isweep, angle_choice, str(Rshift).split('.')[1])
+    outpath = gnr_path_btr.format(shot, channelval, modex, isweep, angle_choice, str(drho).split('.')[1])
 
     #if not outpath.parent.exists():
      #   outpath.parent.mkdir(parents=True)
@@ -116,20 +118,20 @@ def custom_beam3d(machine, shot, isweep, Rshift, twindow, modex, channelval, fla
 #%% Try 
 
 if __name__ == '__main__':
-    t_start, dt = 8.6, 0.2 #10.8
-    machine, shot, twindow, modex, channelval = 'west', 60269, np.array([t_start, t_start + dt]), 1, 2
-    sweep, Rshift = 29, 0.0
-    flag = 1
+    t_start, dt = 7.6, 0.2 #10.8
+    machine, shot, twindow, modex, channelval = 'west', 57558, np.array([t_start, t_start + dt]), 1, 2
+    sweep, drho = 19, 0.0
+    flag = 0
     angle_choice = 'ver'
-    output_3, interface_3 = custom_beam3d(machine, shot, sweep, Rshift, twindow, modex, channelval, flag , angle_choice, verbose = True)
+    output_3, interface_3= custom_beam3d(machine, shot, sweep, drho, twindow, modex, channelval, flag , angle_choice, verbose = True)
 
 
 #%%
 if __name__ == '__main__':
     machine, shot, twindow, modex, channelval = 'west', 57558, np.array([6.2, 6.4]), 1, 2
-    sweep, Rshift = 12, -0.037
+    sweep, drho = 12, -0.037
     flag = 0
-    output_shift, interface_shift = custom_beam3d(machine, shot, sweep, Rshift, twindow, modex, channelval, flag , verbose = True)
+    output_shift, interface_shift = custom_beam3d(machine, shot, sweep, drho, twindow, modex, channelval, flag , verbose = True)
 
 #%% try plot 
 
