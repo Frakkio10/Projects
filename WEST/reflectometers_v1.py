@@ -47,11 +47,11 @@ class DREFRAP(Profile):
     """DREFRAP reflectometer density profile."""
     
     
-    def __init__(self, shot, flag, Rshift, ne_max = None, R_max = None,  twindow=None, verbose=False):
+    def __init__(self, shot, flag, drho = 0.0, ne_max = None, R_max = None,  twindow=None, verbose=False):
         super().__init__('DREFRAP')
         self.machine = 'WEST'
         self.rho_bord = 1.3
-
+        
         #Obtaining the density data 
         if flag == 0:
             if verbose:
@@ -106,7 +106,7 @@ class DREFRAP(Profile):
         self.Z         = Z
         self.Phi       = Phi
         self.flag      = flag
-        self.Rshift    = Rshift
+        self.drho      = drho
         self.ne_max    = ne_max
         self.R_max     = R_max 
         
@@ -140,14 +140,14 @@ class DREFRAP(Profile):
 
         
         if twindow is not None:
-           self = DREFRAP(shot=self.shot, flag = self.flag, Rshift = self.Rshift, ne_max = self.ne_max, R_max = self.R_max, twindow=twindow)
+           self = DREFRAP(shot=self.shot, flag = self.flag, drho = self.drho, ne_max = self.ne_max, R_max = self.R_max, twindow=twindow)
 
         if not averaged:
             # interpolation from cylindrical to rho coordinates:
             t, R, Phi,Z = self.get_flattened_data(self.time, self.R, self.Phi,self.Z)
             
             # apply horizontal for adjustment:
-            #R += self.Rshift
+            #R += self.drho
 
             if not verbose:
                 with suppress_output():
@@ -174,7 +174,7 @@ class DREFRAP(Profile):
         
         else: #averaged
             
-            #self.R += self.Rshift
+            #self.R += self.drho
             #starting the edit 
             if self.set_max == 'y':
                 cond = (np.max(self.ne, axis = 0) > self.ne_max) & ( np.max(self.R, axis = 0) > self.R_max)
@@ -191,7 +191,7 @@ class DREFRAP(Profile):
             R_int, ne_interp = self.interpolate(nmesh=100)
             
             # apply horizontal shift for adjustment:
-            #R += self.Rshift
+            #R += self.drho
             
             Phi = Phi.mean() * np.ones_like(R_int)
             Z = Z.mean() * np.ones_like(R_int)
@@ -223,8 +223,8 @@ class DREFRAP(Profile):
             if twindow is None:
                 twindow = [t.min(), t.max()]
 
-            data = dict({'header':header_txt, 'shot':self.shot, 'twindow':twindow, 't':t, 'rho_psi':rho_psi + self.Rshift, 'ne':ne, 'ne_std':ne_std, 'R':R_int, 'Z':Z, \
-                'rshift':self.Rshift, 'ne_max':self.ne_max, 'R_max':self.R_max, 'ne_int':self.ne_int})
+            data = dict({'header':header_txt, 'shot':self.shot, 'twindow':twindow, 't':t, 'rho_psi':rho_psi + self.drho, 'ne':ne, 'ne_std':ne_std, 'R':R_int, 'Z':Z, \
+                'drho':self.drho, 'ne_max':self.ne_max, 'R_max':self.R_max, 'ne_int':self.ne_int})
 
         return data
     
@@ -332,7 +332,7 @@ class DREFRAP(Profile):
     
 #%%
 if __name__ == '__main__':
-    nprof = DREFRAP(60269, flag = 1, Rshift = 0, twindow=[8.6, 8.8], verbose = False)    
+    nprof = DREFRAP(57558, flag = 0, drho = 0, twindow=[7.6, 7.8], verbose = False)    
     data = nprof.get_ne(verbose=False, averaged=True)
 
     
@@ -352,7 +352,7 @@ if __name__ == '__main__':
 if __name__ == '__main__':
     #fig, ax = plt.subplots( figsize = (8,8))
     # %matplotlib widget
-    nprof = DREFRAP(60269, flag = 1, twindow=[5.2, 5.4], Rshift = 0 , verbose = False)
+    nprof = DREFRAP(60269, flag = 1, twindow=[5.2, 5.4], drho = 0 , verbose = False)
     data0 = nprof.get_ne(verbose=False, averaged=True)
     plt.plot(data0['R'], data0['ne'])
     plt.xlim(2.5, 3.2)
@@ -363,9 +363,9 @@ if __name__ == '__main__':
 #%%
 if __name__ == '__main__':
     #fig, ax = plt.subplots( figsize = (8,8))
-    nprof = DREFRAP(60269, 1, 0, twindow=[5.2, 5.4], Rshift = 0 , verbose = False)
+    nprof = DREFRAP(60269, 1, 0, twindow=[5.2, 5.4], drho = 0 , verbose = False)
     data0 = nprof.get_ne(verbose=False, averaged=True)
-    nprof = DREFRAP(60269, flag = 1, twindow=[5.2, 5.4], Rshift = -0.037 , verbose = False)
+    nprof = DREFRAP(60269, flag = 1, twindow=[5.2, 5.4], drho = -0.037 , verbose = False)
     data1 = nprof.get_ne(verbose=False, averaged=True)
     #nprof.plot(twindow=[8.6, 8.8], averaged=True, errorbars=True, errorband=False, unit_factor=1e-19)
     fig, ax = plt.subplots(2, 1, figsize = (6,8))
