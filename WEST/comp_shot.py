@@ -99,10 +99,11 @@ def read_file(shot, xmode, isweep, user, angle = None, ch = None, shift = None, 
 
         user_txt = 'LAURE VERMARE'
         #filename_btra = LV_beamtr_gnr.format(shot, shot, xmode, isweep)
-        if shift == 0.0:
-            filename_btra = LV_beamtr_gnr.format(shot, shot, xmode, isweep, str(shift).split('.')[0] )
-        else:
-            filename_btra = LV_beamtr_gnr.format(shot, shot, xmode, isweep, '-'+str(shift).split('.')[1] )
+        if filename_btra is None:
+            if shift == 0.0:
+                filename_btra = LV_beamtr_gnr.format(shot, shot, xmode, isweep, str(shift).split('.')[0] )
+            else:
+                filename_btra = LV_beamtr_gnr.format(shot, shot, xmode, isweep, '-'+str(shift).split('.')[1] )
         
         if isweep == 19:
             btra = loadmat(filename_btra)['out'][0][0][0][0]['d19'][0][0]
@@ -369,7 +370,9 @@ plt.show()
 # %%
 shot, xmode, isweep, rshift, flag = 57558, 1, 19, 1, 2
 
-out_LV = read_file(shot, xmode, isweep, 'LV', ch = 2, shift = 0.0)
+file0 = '/Home/difdop/WEST_traceray_2022/57558/57558WEST_1_reflecto_19_freq_all_dr0_old2.mat'
+
+out_LV = read_file(shot, xmode, isweep, 'LV', ch = 2, shift = 0.0, filename_btra = file0)
 
 file1 = "/Home/difdop/DBSdata/processed/beamtracing/west/57558_FO/ch2_modex1_isweep19_ver_dr0.mat"
 out_FO_1 = read_file(shot, xmode, isweep, 'FO', ch = 2, shift = 0.0, filename_btra = file1)
@@ -382,17 +385,17 @@ out_FO_3 = read_file(shot, xmode, isweep, 'FO', ch = 2, shift = 0.0, filename_bt
 # %%
 fig, ax = plt.subplots(1, 2, figsize = (10, 4))
 
-ax[0].plot(out_LV['rho_psi'], out_LV['ne']*1e-19, lw = 8, label = 'LV')
+ax[0].plot(rho_psi_LV, ne_LV*1e-19, lw = 8, label = 'LV-git')
+ax[0]
 ax[0].plot(out_FO_1['rho_psi'], out_FO_1['ne']*1e-19, lw = 4, label = 'FO')
-ax[0].plot(out_FO_2['rho_psi'], out_FO_2['ne']*1e-19, 'k-.', lw = 1, label = 'FO-LV')
+#ax[0].plot(out_FO_2['rho_psi'], out_FO_2['ne']*1e-19, 'k-.', lw = 1, label = 'FO-LV')
 ax[0].grid(c = 'silver', lw = 0.5)
 ax[0].set_xlabel(r'$\rho_\psi$')
 ax[0].set_ylabel(r'$n_e$ [$10^{19}$ $m^{-3}$]')
-ax[0].legend()
 
-ax[1].plot(out_LV['rho'], out_LV['k_perp']*2, '.', label = 'LV')
+ax[1].plot(rho, k_perp_LV*2, '.', label = 'LV-git')
 ax[1].plot(out_FO_1['rho'], out_FO_1['k_perp'], '.', label = 'FO')
-ax[1].plot(out_FO_2['rho'], out_FO_2['k_perp'], '.', label = 'FO-LV')
+#ax[1].plot(out_FO_2['rho'], out_FO_2['k_perp'], '.', label = 'FO-LV')
 ax[1].grid(c = 'silver', lw = 0.5)
 ax[1].set_xlabel(r'$\rho_\psi$')
 ax[1].set_ylabel(r'$k_\perp$ [$cm^{-1}$]')
@@ -400,9 +403,9 @@ ax[1].legend()
 
 fig, ax = plt.subplots()
 
-ax.plot(out_LV['freqGHz'], out_LV['k_perp']*2, '.', label = 'LV')
+ax.plot(freqGHz_LV, k_perp_LV*2, '.', label = 'LV-git')
 ax.plot(out_FO_1['freqGHz'], out_FO_1['k_perp'], '.', label = 'FO')
-ax.plot(out_FO_2['freqGHz'], out_FO_2['k_perp'], '.', label = 'FO-LV')
+#ax.plot(out_FO_2['freqGHz'], out_FO_2['k_perp'], '.', label = 'FO-LV')
 ax.grid(c = 'silver', lw = 0.5)
 ax.set_xlabel(r'$f_{prob}$ [GHz]')
 ax.set_ylabel(r'$k_\perp$ [$cm^{-1}$]')
