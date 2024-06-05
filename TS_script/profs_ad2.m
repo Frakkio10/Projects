@@ -140,7 +140,7 @@ grid on
 axis([0 duree_plasma+2 1.2*min(svideo) 1.2*max(sangle)])
 title(['# ', num2str(numc) 'DIFDOP acquisition']) 
 
-
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 disp('load ECE data')
 %ECE
 [te_ece, tps_ece, poubelle, poubelle, r_ece] = tsbase(numc,'GSHTE', 'GSHR');

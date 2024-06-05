@@ -106,9 +106,7 @@ def time_trace(shot):
     ece_df = pd.DataFrame()
     ece_df['time_ece'] = ece.time - t_ignitron
     ece_df['T_e'] = ece.t_e_central.data
-    
-    
-    
+
     return summary_df, ece_df
 
 def sel(k, dk, sweeps):
@@ -130,6 +128,7 @@ def sel(k, dk, sweeps):
             
     return selected 
 
+#%%
 def DBS_df(shot, ch, isweep, sort = False):
     global gnr_path_fdop, gnr_path_btr
     
@@ -139,12 +138,13 @@ def DBS_df(shot, ch, isweep, sort = False):
         mode = 1
         
     filename_fdop = gnr_path_fdop.format(shot, ch, isweep)
-    #filename_btr = gnr_path_btr.format(shot, ch, mode, isweep)
+    filename_btr = gnr_path_btr.format(shot, ch, mode, isweep)
     try:
         fdop_est = loadmat(filename_fdop)['outp'][0]
         val = fdop_est['validated'][0][0]
 
-    #beam_trc = loadmat(filename_btr)['outp'][0]
+    beam_trc = loadmat(filename_btr)['outp'][0]
+    
     except FileNotFoundError:
         print(f'File {filename_fdop} not found')
         return 
@@ -172,12 +172,12 @@ def DBS_df(shot, ch, isweep, sort = False):
     DBS_spect_df['fDop'] =  fdop_est['fDop'][0][0, val == 1]*1e-3
     DBS_spect_df['dfDop'] =  fdop_est['dfDop'][0][0, val == 1]*1e-3
     DBS_spect_df['pbfreq'] =  fdop_est['freqGHz'][0][0, val == 1]
-    #DBS_btr_df['k_perp'] = beam_trc['k_perp'][0][0, val == 1]*2e2
-    #DBS_btr_df['rho'] = beam_trc['rho'][0][0, val == 1]
-    #DBS_btr_df['v_perp'] = 2*np.pi*DBS_spect_df.fDop/DBS_btr_df.k_perp
+    DBS_btr_df['k_perp'] = beam_trc['k_perp'][0][0, val == 1]*2e2
+    DBS_btr_df['rho_psi'] = beam_trc['rho'][0][0, val == 1]
+    DBS_btr_df['v_perp'] = 2*np.pi*DBS_spect_df.fDop/DBS_btr_df.k_perp
     
-    #return DBS_spect_df, DBS_btr_df
-    return DBS_spect_df
+    return DBS_spect_df, DBS_btr_df
+    #return DBS_spect_df
 #%%
 #ne_reflec=out_reflec.channel{1}.n_e.data;
 #phi_reflec=out_reflec.channel{1}.position.phi.data;r_reflec=out_reflec.channel{1}.position.r.data;z_reflec=out_reflec.channel{1}.position.z.data;
@@ -187,8 +187,8 @@ pos = out_reflec.channel[0].position
 r_refl, z_refl, phi_refl = pos.r, pos.z, pos.phi
 
 #%% example
-shot = 57558
-sweeps = [11, 19]
+shot = 58333
+sweeps = [4, 18, 24]
 _ = extract_DBS_files(shot, machine=machine,  extract_all=True)
 
 summary, ece = time_trace(shot)
@@ -255,6 +255,13 @@ def plot_prof(prof, color, font, lbl, ax = None,  err = False, save = False):
     if save == True:
         plt.savefig()
 
+#%%
+machine = 'west'
+shot = 58333
+isweep = 24
+proff = DBS_df(shot, 2, isweep, sort = False)
+
+
 #%% READ PROFILE
 machine = 'west'
 shot = 58333
@@ -271,7 +278,7 @@ proff_Xmode24 = DBS_Profile(*args)
 isweep = 17
 args = (machine, shot, isweep, True, 2)
 proff_Xmode17 = DBS_Profile(*args)
-
+#%%
 fig, ax = plt.subplots(figsize = (10,4))
 #plot_prof(proff_Omode4, 'dodgerblue', 'o', 'Omode 4', ax, err = False)
 plot_prof(proff_Xmode4, 'dodgerblue', 'x', 'Xmode 4', ax, err = False)
@@ -327,7 +334,7 @@ ax.legend(shots)
 # %% to go back on this 
 #dataI = DataInterface(shot, isweep='False', channelval=1, machine='west')
 
-shot = 57558
+shot = 58333
 dataI = DataInterface(shot, isweep = 5, channelval=2, machine='west')
 params = dataI.params
 t_difdop = params.TDIFDOP
@@ -356,7 +363,7 @@ angle = np.mean(anglepol[idx])
 
 #%%
 shot = 58333
-t_start = 20.2
+t_start = 23.8
 dt = 0.6
 t, anglepol = get_angle_pol(machine, shot, t_start, t_start + dt, return_val='array')
 
@@ -526,3 +533,10 @@ machine, shot, isweep, xmode, channelval = 'west', 57558, 19, 1, 1
 output, beam3d_interface = _DBSbeam(machine, shot, isweep = 11, xmode = 0, channelval = 1, verbose = True, plot = True, ifreqs = 'all')
 
 # %%
+from pywest import polview
+
+shots = [55562, 59824, 59785]
+figure, ax = plt.subplots()
+for shot, col in zip(shots, ['r', 'b','g']):
+    polview(shot, time=6.5, ax=ax, colors=col)
+ax.legend(shots)
