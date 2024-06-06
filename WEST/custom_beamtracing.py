@@ -13,10 +13,7 @@ from pywest import polview
 from pathlib import Path
 from scipy.io import loadmat
 
-#gnr_path_btr = "/home/SR273822/data/DBSdata/processed/beamtracing/west/{}_FO/ch{}_modex{}_isweep{}.mat"
-gnr_path_btr = "/Home/difdop/DBSdata/processed/beamtracing/west/{}_FO/ch{}_modex{}_isweep{}_{}_dr{}.mat"
-LV_beamtr_gnr = '/Home/difdop/WEST_traceray_2022/{}/{}WEST_{}_reflecto_{}_freq_all_dr{}.mat'
-
+gnr_path_btr = "/Home/difdop/DBSdata/processed/beamtracing/west/{}_{}/ch{}_modex{}_isweep{}_{}_dr{}.mat"
 
 def plot_density(nprof, data):    
     fig, ax = plt.subplots(1, 2, figsize = (10, 4))
@@ -29,29 +26,18 @@ def plot_density(nprof, data):
     ax[1].set_ylabel(r'$n_e$ [$10^{19}$ $m^{-3}$]')
     plt.show()
 
-def custom_beam3d(machine, shot, isweep, drho, twindow, modex, channelval, flag, angle_choice, verbose = True):
+def custom_beam3d(machine, shot, isweep, drho, twindow, modex, channelval, flag, angle_choice = 'ver', user = 'FO', verbose = True):
     
-    filename = gnr_path_btr.format(shot, channelval, modex, isweep, angle_choice,  str(drho).split('.')[1])
+    outpath = gnr_path_btr.format(shot, user, channelval, modex, isweep, angle_choice,  str(drho).split('.')[1])
 
-
-    #get density profiles and prepare the construct
+    #get density profiles and prepare the construct --> density profile averaged on the time interval of the iteration 
     print('Retrieving Density Data from DREFRAP')
     nprof = DREFRAP(shot, flag, drho, twindow = twindow, verbose = True)
-
-
     data = nprof.get_ne(verbose=False, averaged=True)
     densityprof = DensityProf1d(data['rho_psi'], data['ne'], data['drho'], data['ne_max'], data['R_max'], 'west', shot, twindow, description = data['header'])
     plot_density(nprof, data)
-    
-    #reading density from LV beamtracing 
-    #filename_btra = LV_beamtr_gnr.format(shot, shot, modex, isweep, 0)
-    #btra = loadmat(filename_btra)['out'][0][0][0][0]['d19'][0][0]
-    #rho_psi = btra['rho'][0][0]
-    #ne = btra['ne'][0][0]
-    #drho = btra['drho'][0][0]
-    #densityprof = DensityProf1d(rho_psi, ne, drho, 6.0, 0, 'west', shot, twindow, description = None)
 
-    #retrieve or extract equi profiles and build the construct using the mean tim efrom the timewindwo
+    #retrieve or extract equi profiles and build the construct using the mean time from the time interval 
     print('Retrieving Equilibrium')
     equilibrium = retrieve_west_eq(shot, twindow, override=False, verbose=False) #using matlab script "get_equilibrium"
     time = np.mean(twindow)
@@ -61,11 +47,20 @@ def custom_beam3d(machine, shot, isweep, drho, twindow, modex, channelval, flag,
     print('Retrieving DIFDOP data')
     dataI = DataInterface.from_time(shot, time, channelval, machine)
     t0s = dataI.get_start_time_of_freq_step()
-    #dtStep = np.diff(t0s).mean()
-    dtStep = 0.2
+    
+    set_dt = input('Do you want to select a different dt for the angle? (y/n) Default dt = %.2f s' %(twindow[1] - twindow[0]))
+    if set_dt == 'y':
+        dtStep = float(input('dt to select (in s) : '))
+    elif set_dt == 'n':
+        dtStep = twindow[1] - twindow[0]
+    else:
+        print('!!Interrupting!!')
+        return '', ''
+        
+    print('using dt = %.2f s for the mean angle' %dtStep)
+    print(30*'-')
     FreqGHz = dataI.params.F
     N = len(FreqGHz)
-    #N = 5
     
     if angle_choice == 'ver':
         use_inclinometer = False
@@ -75,35 +70,29 @@ def custom_beam3d(machine, shot, isweep, drho, twindow, modex, channelval, flag,
     anglepol = [get_angle_pol(machine,shot, t0s[i], t0s[i] + dtStep, use_inclinometer) for i in range(N)]
     if machine == 'west':
         anglepol = [np.mean(anglepol)] * N
-        print(anglepol[0])
         print(f'warning: using the mean anglepol over all frequencies on WEST. dt for the average {dtStep}' ) #can be changed
+    print('mean angle used = %.2f' %anglepol[0])
     
     #prepare the launcher 
     LauncherCls = DIFDOP if machine == 'west' else TCVDUALV
     launcher  = [LauncherCls(freqGHz=FreqGHz[i], anglepol=anglepol[i], modex=modex) for i in range(N)]
     
-    #create the path to save the date
-    #outpath = defs.get_path_for('beam3d_output', machine=machine,
-                            #shot=shot, xmode=modex,channelval=channelval, isweep=dataI.isweep)
-    outpath = gnr_path_btr.format(shot, channelval, modex, isweep, angle_choice, str(drho).split('.')[1])
-
-    #if not outpath.parent.exists():
-     #   outpath.parent.mkdir(parents=True)
-
     #running and fetching the results 
-    if Path(filename).is_file():
-        print('!! The beam tracing has been already performed!!')
-        run_already = input("Do you want to run already? y/n")
+    if Path(outpath).is_file():
+        run_already = input("!! The beam tracing has been already performed!! Do you want to run already? y/n")
         if run_already == 'n':
             print('Fetching the results')
             interface = Beam3dInterface(shot, launcher, densityprof, equilibrium ,outpath=outpath)
             outp = interface.fetch_result()
             #return outp, interface
-        else:
+        elif run_already == 'y':
             print('Running the beam tracing')
             interface = Beam3dInterface(shot, launcher, densityprof, equilibrium ,outpath=outpath)
             interface.run_beam3d(outpath = outpath)
             outp = interface.fetch_result()
+        else:
+            print('!!Interrupting!!')
+            return '', ''
     else:
         print('Running the beam tracing')
         interface = Beam3dInterface(shot, launcher, densityprof, equilibrium ,outpath=outpath)
@@ -124,6 +113,9 @@ if __name__ == '__main__':
     flag = 0
     angle_choice = 'ver'
     output_3, interface_3= custom_beam3d(machine, shot, sweep, drho, twindow, modex, channelval, flag , angle_choice, verbose = True)
+
+
+
 
 
 #%%
@@ -178,4 +170,5 @@ if __name__ == '__main__':
         t,y = read_angle_pol('west', 58333, use_inclinometer=use_inclinometer)
         ax.plot(t,y, label=lab); ax.legend(); ax.set_xlabel('time [s]'); ax.set_ylabel('poloidal angle [deg]')
     
+
 # %%
