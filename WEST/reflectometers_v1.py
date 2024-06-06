@@ -69,7 +69,7 @@ class DREFRAP(Profile):
             Z = data.channel[0].position.z
             Phi = data.channel[0].position.phi
             
-        elif flag == 1:
+        '''elif flag == 1:
             gnr_path_DREFRAP = '/Home/FC139710/WEST/drefrap/Profil/data_prof/WEST_{}_prof.mat'
             filemat_ne = gnr_path_DREFRAP.format(shot)
             try:
@@ -84,7 +84,7 @@ class DREFRAP(Profile):
             R = np.transpose(data['RX'])
             a, b = np.shape(ne)
             Phi = 2.4435*np.ones([a,b]) 
-            Z = np.zeros([a,b])
+            Z = np.zeros([a,b])'''
 
         mod_raf = tsmat(shot, 'DREFRAP;BALAYAGE_V;mod_raf_V')
         
