@@ -143,11 +143,18 @@ class DREFRAP(Profile):
            self = DREFRAP(shot=self.shot, flag = self.flag, drho = self.drho, ne_max = self.ne_max, R_max = self.R_max, twindow=twindow)
 
         if not averaged:
+            
+            #select the data that satisfied the choice of ne_max and R_max 
+            if self.set_max == 'y':
+                cond = (np.max(self.ne, axis = 0) > self.ne_max) & ( np.max(self.R, axis = 0) > self.R_max)
+                ind = np.where(cond)[0]
+                ne = self.ne[:, ind]
+                R = self.R[:, ind]
+                self.ne = ne
+                self.R = R
+                
             # interpolation from cylindrical to rho coordinates:
             t, R, Phi,Z = self.get_flattened_data(self.time, self.R, self.Phi,self.Z)
-            
-            # apply horizontal for adjustment:
-            #R += self.drho
 
             if not verbose:
                 with suppress_output():
@@ -157,24 +164,15 @@ class DREFRAP(Profile):
             
             rho_psi = rho_psi.reshape(*self.R.shape, order='F')
             
-            #starting the edit 
-            if self.set_max == 'y':
-                #cond1 = np.max(self.ne, axis = 0) > self.ne_max
-                #cond2 = np.max(self.R, axis = 0) > self.R_max
-                cond = (np.max(self.ne, axis = 0) > self.ne_max) & ( np.max(self.R, axis = 0) > self.R_max)
-                #ind = np.where(cond1 & cond2)[0]
-                ind = np.where(cond)[0]
-                self.ne = self.ne[:, ind]
-                self.R = self.R[:, ind]
-            #finish the edit
-            #t, R, ne = self.time, self.R, self.ne
+            t, R, ne = self.time, self.R, self.ne
             
             data = dict({'shot':self.shot, 't':t, 'rho_psi':rho_psi, 'ne':ne, 'R':R, 'Z':Z,\
-                'ne_max':self.ne_max, 'R_max':self.R_max})
-        
+                'drho':self.drho, 'ne_max':self.ne_max, 'R_max':self.R_max})
+            
+            self.data = data
+
         else: #averaged
             
-            #self.R += self.drho
             #starting the edit 
             if self.set_max == 'y':
                 cond = (np.max(self.ne, axis = 0) > self.ne_max) & ( np.max(self.R, axis = 0) > self.R_max)
@@ -199,25 +197,24 @@ class DREFRAP(Profile):
                 with suppress_output():
                     rho_psi = equimap.get(self.shot,t.mean() + self.t_ignitron,R_int,Phi,Z,'rho_pol_norm')
             else:
-                #rho_psi = equimap.get(self.shot,t.mean() + self.t_ignitron,R,Phi,Z,'rho_pol_norm')
-                rho_psi = equimap.get(self.shot,t.mean(),R_int,Phi,Z,'rho_pol_norm')         
+                rho_psi = equimap.get(self.shot,t.mean() + self.t_ignitron,R_int,Phi,Z,'rho_pol_norm')
+                #rho_psi = equimap.get(self.shot,t.mean(),R_int,Phi,Z,'rho_pol_norm')         
             
             ne = ne_interp.mean(axis=1)
             self.ne_int = ne
             ne_std = ne_interp.std(axis = 1)            
-            rho_tmp = np.flip(rho_psi)
+            self.rho_tmp = np.flip(rho_psi)
             ne_tmp = ne
 
-            if rho_tmp[-1] < self.rho_bord:
-                rho_add = np.linspace(rho_tmp[-1] + (self.rho_bord - rho_tmp[-1])/10, self.rho_bord, 100)
-                rho_end = rho_tmp[-1]
+
+            if self.rho_tmp[-1] < self.rho_bord:
+                rho_add = np.linspace(self.rho_tmp[-1] + (self.rho_bord - self.rho_tmp[-1])/10, self.rho_bord, 100)
+                rho_end = self.rho_tmp[-1]
                 ne_add = np.linspace(ne_tmp[0]/10 , 0, 100)
-                
-                rho_tmp = np.append(rho_tmp,rho_add)
+                rho_psi = np.append(self.rho_tmp,rho_add)
                 ne_tmp = np.append( ne_add, ne_tmp)
-                rho_psi = np.flip(rho_tmp)
+                rho_psi = np.flip(rho_psi)
                 ne = ne_tmp
-            
             
             header_txt = f'Reflectometry profile averaged over {len(t)} profiles' if averaged else ''
             if twindow is None:
@@ -225,15 +222,17 @@ class DREFRAP(Profile):
 
             data = dict({'header':header_txt, 'shot':self.shot, 'twindow':twindow, 't':t, 'rho_psi':rho_psi + self.drho, 'ne':ne, 'ne_std':ne_std, 'R':R_int, 'Z':Z, \
                 'drho':self.drho, 'ne_max':self.ne_max, 'R_max':self.R_max, 'ne_int':self.ne_int})
-
+            
+            self.data = data
         return data
     
     def plot_ne(self, twindow=None, xcoord='rho_psi', averaged=False, ax=None, axis_labels=True, 
-                shot_annotation=True, errorbars=False, errorband=False, xshift=0, unit_factor=1, **kwargs):
+                shot_annotation=True, errorbars=False, errorband=False, xshift=0, unit_factor=11, **kwargs):
 
-        verbose = kwargs.pop('verbose', True)
-        data = self.get_ne(twindow=twindow, averaged=averaged, verbose=verbose)
-
+        verbose = kwargs.pop('verbose', False)
+        #data = self.get_ne(twindow=twindow, averaged=averaged, verbose=verbose)
+        data = self.data
+        
         rho_psi = data['rho_psi']
         R = data['R']
         ne = data['ne']
@@ -252,16 +251,16 @@ class DREFRAP(Profile):
         else:
             raise ValueError('xcoord must be either "rho_psi" or "R"')
         
-        fmt = kwargs.get('fmt', 'o')
+        fmt = kwargs.get('fmt', '.')
         kwargs.pop('fmt', None)
 
         if averaged:
             if errorbars:
-                ax.errorbar(x, ne * unit_factor, yerr=ne_std * unit_factor, fmt=fmt, **kwargs)
+                ax.errorbar(np.flip(self.rho_tmp), data['ne_int'] * unit_factor, yerr=ne_std * unit_factor, fmt=fmt, **kwargs)
             if errorband:
-                ax.fill_between(x, (ne - ne_std) * unit_factor, (ne + ne_std) * unit_factor, alpha=0.3)
+                ax.fill_between(np.flip(self.rho_tmp), (data['ne_int'] - ne_std) * unit_factor, (data['ne_int'] + ne_std) * unit_factor, alpha=0.3)
             
-            ax.plot(x, ne * unit_factor, fmt, **kwargs)
+            ax.plot(np.flip(self.rho_tmp), data['ne_int'] * unit_factor, fmt, **kwargs)
         else:
             ax.plot(x, ne * unit_factor, fmt, **kwargs)
 
@@ -332,10 +331,23 @@ class DREFRAP(Profile):
     
 #%%
 if __name__ == '__main__':
-    nprof = DREFRAP(57558, flag = 0, drho = 0, twindow=[7.6, 7.8], verbose = False)    
-    data = nprof.get_ne(verbose=False, averaged=True)
-
+    nprof2 = DREFRAP(57558, flag = 0,  drho = 0.0, twindow=[7.6, 7.8], verbose = False)    
+    data2 = nprof2.get_ne(averaged = True, verbose = True)
+    nprof2.plot_ne(errorband = True, errorbars = True, averaged=True, verbose = True)
     
+    
+
+
+#%%
+    fig, ax = plt.subplots(1, 2, figsize = (10, 4))
+
+    ax[0].plot(data2['R'], data2['ne_int']*1e-19, 'b')
+    ax[0].set_xlabel('R [m]')
+    ax[0].set_ylabel(r'$n_e$ [$10^{19}$ $m^{-3}$]')
+    ax[1].plot(data2['rho_psi'], data2['ne']*1e-19, 'b')
+    ax[1].set_xlabel(r'$\rho_\psi$')
+    ax[1].set_ylabel(r'$n_e$ [$10^{19}$ $m^{-3}$]')
+
     fig, ax = plt.subplots(1, 2, figsize = (10, 4))
     ax[0].plot(nprof.R , nprof.ne*1e-19, 'silver', lw = 0.5)
     ax[0].plot(data['R'], data['ne_int']*1e-19, 'r')
@@ -345,6 +357,7 @@ if __name__ == '__main__':
     ax[1].set_xlabel(r'$\rho_\psi$')
     ax[1].set_ylabel(r'$n_e$ [$10^{19}$ $m^{-3}$]')
         
+
 
     
 
