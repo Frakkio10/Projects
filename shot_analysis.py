@@ -55,8 +55,8 @@ def plot_tt(shot, sweeps, save = False):
     summary, ece = get_tt(shot)
     tstart, tend = min(summary.time), max(summary.time)
 
-    t, anglepol_ver = get_angle_pol(machine, shot, tstart, tend,use_inc = False, return_val='array')
-    t, anglepol_inc = get_angle_pol(machine, shot, tstart, tend,use_inc = True, return_val='array')
+    t, anglepol = get_angle_pol(machine, shot, tstart, tend,t_averaged = False, use_inclinometer = False)
+    #t, anglepol_inc = get_angle_pol(machine, shot, tstart, tend,t_averaged = False, use_inclinometer = True)
 
     dataI = DataInterface(shot, isweep = 5, channelval = 1, machine='west')
     params = dataI.params
@@ -65,8 +65,8 @@ def plot_tt(shot, sweeps, save = False):
     
     fig, ax = plt.subplots( figsize = (15, 4))
     ax.set_title('SHOT #%d' %shot,  size = 18)
-    ax.plot(t , anglepol_inc, 'silver', lw = 0.8, label = r'inclinometre [°]')
-    ax.plot(t , anglepol_ver, 'skyblue', lw = 0.8, label = r'verin [°]')
+    #ax.plot(t , anglepol_inc, 'silver', lw = 0.8, label = r'inclinometre [°]')
+    ax.plot(t , anglepol, 'skyblue', lw = 0.8, label = r'verin [°]')
 
     ax.legend(loc = 'center left', bbox_to_anchor = (1, 0.5))
     ax.grid(c = 'silver', ls ='--', lw = 0.5)
@@ -74,7 +74,7 @@ def plot_tt(shot, sweeps, save = False):
     ax.plot(summary['time'], -summary['ip']/2*1e-5, 'magenta', label = r'$I_p$ [200kA]') #200kA
     ax.plot(summary['time'], summary['n_e']*1e-19, 'b', label = r'$\overline{n_e}$ [$10^{19}$ $m^{-3}$]') #1e19
     ax.plot(summary['time'], summary['p_ic']*1e-6, 'red', label = r'$P_{ICRH}$ [MW]') #MW
-    #ax.plot(summary['time'], summary['p_lh']*1e-6, 'r', label = r'$P_{LH}$ [MW]') #MW
+    ax.plot(summary['time'], summary['p_lh']*1e-6, 'r', label = r'$P_{LH}$ [MW]') #MW
     #ax.plot(summary['time'], summary.p_ohm*1e-6, 'coral', label = r'$P_{Ohm}$ [MW]') #MW
     ax.plot(ece['time_ece'], ece['T_e']*1e-3, 'dodgerblue', label = r'$T_{e0}$ [eV]') #eV
     
@@ -174,12 +174,12 @@ def conc(profile_O, profile_X):
 # %% example for the plots 
 
 #time traces
-shot = 58333
+shot = 58108
 _ = extract_DBS_files(shot, machine=machine,  extract_all=True)
-isweeps = [5, 12, 19]
+isweeps = [9, 12, 19]
 plot_tt(shot, isweeps, save = False)
 
-#%%
+_#%%
 #equilibrium 
 shots = [57558]
 colors = ['r']

@@ -29,8 +29,8 @@ class TIMETRACE():
     def DIFDOP(self, tstart, tend, isweep = None):
         if isweep is None:
             isweep = 5
-        time, anglepol_inc = get_angle_pol(self.machine, self.shot, tstart, tend, use_inc = True, return_val='array')
-        time, anglepol_ver = get_angle_pol(self.machine, self.shot, tstart, tend, use_inc = False, return_val='array')
+        time, anglepol_inc = get_angle_pol(self.machine, self.shot, tstart, tend, t_averaged=False, use_inclinometer = True)
+        time, anglepol_ver = get_angle_pol(self.machine, self.shot, tstart, tend, t_averaged=False, use_inclinometer = False)
         dataI = DataInterface(self.shot, isweep, channelval = 1, machine='west')
         params = dataI.params
         t_DIFDOP = params.TDIFDOP
@@ -52,10 +52,10 @@ class TIMETRACE():
         p_ic = summary.heating_current_drive.power_ic.value #total IC Power [W]
         p_lh = summary.heating_current_drive.power_lh.value #total LH Power [W]
         time_ece = ece.time - t_ignitron
-        T_e = ece.channel[0].t_e.data #electron temperature [eV]
+        #T_e = ece.channel[0].t_e.data #electron temperature [eV]
         header_txt = 'Summary: time traces'
         time_traces = dict({'header':header_txt, 'shot':shot, 'time':time, 'ip':ip, 'p_ohm':p_ohm, 'p_rad':p_rad, \
-            'n_e':n_e,'p_ic':p_ic, 'p_lh':p_lh, 'time_ece':time_ece, 'T_e':T_e})
+            'n_e':n_e,'p_ic':p_ic, 'p_lh':p_lh, 'time_ece':time_ece})
         self.time_traces = time_traces 
         return time_traces
     
@@ -78,16 +78,16 @@ class TIMETRACE():
         ax.plot(tt['time'], -tt['ip']/2*1e-5, 'magenta', label = r'$I_p$ [200 kA]')
         ax.plot(tt['time'], tt['n_e']*1e-19, 'b', label = r'$\overline{n_e}$ [$10^{19}$ $m^{-3}$]')
         ax.plot(tt['time'], tt['p_ohm']*1e-6, 'g', label = r'$P_{ohm}$ [MW]') 
-        #if np.any(tt['p_lh'] != 0):
-            #ax.plot(tt['time'], tt['p_lh']*1e-6, 'r', label = r'$P_{lh}$ [MW]')
+        if np.any(tt['p_lh'] != 0):
+            ax.plot(tt['time'], tt['p_lh']*1e-6, 'r', label = r'$P_{lh}$ [MW]')
         if np.any(tt['p_ic'] != 0):
             ax.plot(tt['time'], tt['p_ic']*1e-6, 'r', label = r'$P_{ic}$ [MW]') 
-        if np.any(tt['T_e'] != 0):
-            ax.plot(tt['time_ece'], tt['T_e']*1e-3, 'dodgerblue', label = r'$T_{e0}$ [eV]') 
+        #if np.any(tt['T_e'] != 0):
+         #   ax.plot(tt['time_ece'], tt['T_e']*1e-3, 'dodgerblue', label = r'$T_{e0}$ [eV]') 
         
         if isweep is not None:
             t_acq = difdop['t_acq']
-            for sweep, col in zip(isweep, colors):
+            for sweep, col in zip(np.array(isweep), np.array(colors)):
                 ax.plot(t_acq[sweep-1]*np.ones(100), np.linspace(-0.1, max(difdop['anglepol_inc']), 100), '--', c = col,label = 'it = %d' %sweep)
 
         ax.legend(loc = 'center left', bbox_to_anchor = (1, 0.5))
@@ -103,10 +103,9 @@ class TIMETRACE():
         
 # %%
 if __name__ == '__main__':
-    summ = TIMETRACE(57558)
+    summ = TIMETRACE(58109)
     tt = summ.get_tt()
-    #summ.plot_tt()
-    summ.plot_tt(isweep = [4, 11, 19], colors = ['r', 'g', 'b'])
+    summ.plot_tt()
 # %%
 
 # %%

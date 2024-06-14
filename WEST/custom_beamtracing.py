@@ -2,7 +2,7 @@
 import numpy as np
 from DBS import definitions as defs
 from DBS.beamtracing import Equilibrium2d, DensityProf1d, Beam3dInterface, DIFDOP, TCVDUALV 
-from WEST.reflectometers_v1 import DREFRAP
+from DBS.beamtracing.custom.reflectometers_v1 import DREFRAP
 import matplotlib.pyplot as plt
 from DBS.io.interface import DataInterface
 from DBS.beamtracing.src.west.io import retreive_west_density_data, retrieve_west_eq
@@ -26,27 +26,40 @@ def plot_density(nprof, data):
     ax[1].set_ylabel(r'$n_e$ [$10^{19}$ $m^{-3}$]')
     plt.show()
 
-def custom_beam3d(machine, shot, isweep, drho, twindow, modex, channelval, flag, angle_choice = 'ver', user = 'FO', verbose = True):
+def get_twindow(shot, isweep, channelval):
+    dataI = DataInterface(shot, isweep, channelval, machine='west')
+    t0s = dataI.get_start_time_of_freq_step()
+    dtStep = np.round(t0s[-1] - t0s[0], 1)
+    twindow = twindow = [t0s[0].round(2), t0s[0].round(2) + dtStep]
     
-    outpath = gnr_path_btr.format(shot, user, channelval, modex, isweep, angle_choice,  str(drho).split('.')[1])
+    return np.mean(twindow), twindow
+    
+def custom_beam3d(machine, shot, isweep, drho, modex, channelval, twindow = None, flag = 0, angle_choice = 'ver', user = 'FO', verbose = True):
+    
+    outpath = gnr_path_btr.format(shot, user, channelval, modex, isweep, angle_choice,  str(float(drho)).split('.')[1])
 
+    if twindow is None:
+        time, twindow = get_twindow(shot, isweep, channelval)
+        
     #get density profiles and prepare the construct --> density profile averaged on the time interval of the iteration 
-    print('Retrieving Density Data from DREFRAP')
-    nprof = DREFRAP(shot, flag, drho, twindow = twindow, verbose = True)
+    print('Retrieving Density Data from DREFRAP', flush = True)
+    nprof = DREFRAP(shot, flag = flag, drho = drho, twindow = twindow, verbose = True)
     data = nprof.get_ne(verbose=False, averaged=True)
     densityprof = DensityProf1d(data['rho_psi'], data['ne'], data['drho'], data['ne_max'], data['R_max'], 'west', shot, twindow, description = data['header'])
     plot_density(nprof, data)
 
     #retrieve or extract equi profiles and build the construct using the mean time from the time interval 
-    print('Retrieving Equilibrium')
+    print('Retrieving Equilibrium', flush = True)
     equilibrium = retrieve_west_eq(shot, twindow, override=False, verbose=False) #using matlab script "get_equilibrium"
     time = np.mean(twindow)
     equilibrium = Equilibrium2d.from_shot(machine, shot, time) #reading from a file 
     
-    #obtain info from difdop on the angle
-    print('Retrieving DIFDOP data')
+    #obtain info from difdop on the angle and asking the user which dt he wants to use for the angle 
+    print(time, twindow)
+    print('Retrieving DIFDOP data', flush = True)
     dataI = DataInterface.from_time(shot, time, channelval, machine)
     t0s = dataI.get_start_time_of_freq_step()
+    dtStep = 0.2
     
     set_dt = input('Do you want to select a different dt for the angle? (y/n) Default dt = %.2f s' %(twindow[1] - twindow[0]))
     if set_dt == 'y':
@@ -57,7 +70,7 @@ def custom_beam3d(machine, shot, isweep, drho, twindow, modex, channelval, flag,
         print('!!Interrupting!!')
         return '', ''
         
-    print('using dt = %.2f s for the mean angle' %dtStep)
+    print('using dt = %.2f s for the mean angle' %dtStep, flush = True)
     print(30*'-')
     FreqGHz = dataI.params.F
     N = len(FreqGHz)
@@ -67,26 +80,31 @@ def custom_beam3d(machine, shot, isweep, drho, twindow, modex, channelval, flag,
     else:
         use_inclinometer = True
         
-    anglepol = [get_angle_pol(machine,shot, t0s[i], t0s[i] + dtStep, use_inclinometer) for i in range(N)]
-    if machine == 'west':
-        anglepol = [np.mean(anglepol)] * N
-        print(f'warning: using the mean anglepol over all frequencies on WEST. dt for the average {dtStep}' ) #can be changed
-    print('mean angle used = %.2f' %anglepol[0])
+    anglepol = get_angle_pol(machine, shot, twindow[0], twindow[0] + dtStep, return_val='mean', use_inclinometer = use_inclinometer,)
+    anglepol = [anglepol] * N
+
+    '''dtStep = np.diff(t0s).mean()
+    anglepol = [get_angle_pol(machine,shot, t0s[i], t0s[i] + dtStep) for i in range(N)]
+    print(anglepol)
+    anglepol = [np.mean(anglepol)] * N'''
+    print('warning: using the mean anglepol over all frequencies on WEST. dt for the average %.3f' %dtStep) #can be changed
+    print('mean angle used = %.4f' %anglepol[0], flush = True)
     
     #prepare the launcher 
     LauncherCls = DIFDOP if machine == 'west' else TCVDUALV
     launcher  = [LauncherCls(freqGHz=FreqGHz[i], anglepol=anglepol[i], modex=modex) for i in range(N)]
     
+    print(outpath)
     #running and fetching the results 
     if Path(outpath).is_file():
         run_already = input("!! The beam tracing has been already performed!! Do you want to run already? y/n")
         if run_already == 'n':
-            print('Fetching the results')
+            print('Fetching the results', flush = True)
             interface = Beam3dInterface(shot, launcher, densityprof, equilibrium ,outpath=outpath)
             outp = interface.fetch_result()
             #return outp, interface
         elif run_already == 'y':
-            print('Running the beam tracing')
+            print('Running the beam tracing', flush = True)
             interface = Beam3dInterface(shot, launcher, densityprof, equilibrium ,outpath=outpath)
             interface.run_beam3d(outpath = outpath)
             outp = interface.fetch_result()
@@ -103,72 +121,11 @@ def custom_beam3d(machine, shot, isweep, drho, twindow, modex, channelval, flag,
     return outp , interface
 
 
-
-#%% Try 
-
-if __name__ == '__main__':
-    t_start, dt = 7.6, 0.2 #10.8
-    machine, shot, twindow, modex, channelval = 'west', 57558, np.array([t_start, t_start + dt]), 1, 2
-    sweep, drho = 19, 0.0
-    flag = 0
-    angle_choice = 'ver'
-    output_3, interface_3= custom_beam3d(machine, shot, sweep, drho, twindow, modex, channelval, flag , angle_choice, verbose = True)
-
-
-
-
-
-#%%
-if __name__ == '__main__':
-    machine, shot, twindow, modex, channelval = 'west', 57558, np.array([6.2, 6.4]), 1, 2
-    sweep, drho = 12, -0.037
-    flag = 0
-    output_shift, interface_shift = custom_beam3d(machine, shot, sweep, drho, twindow, modex, channelval, flag , verbose = True)
-
-#%% try plot 
-
-if __name__ == '__main__':
-    fig, ax = plt.subplots(figsize = (8,8))
-    time = int(np.mean(twindow))
-    lab = 0
-    polview(shot, time, ax=ax, colors='r')
-    for ifreq, freq in enumerate(output_shift.freqGHz[0:20:2]):
-        beam = output_shift.beam[ifreq]
-        dif = output_shift.dif[ifreq]
-        beami = output_shift.beami[ifreq]
-        beami.diagnm = '' # 'tcvvx' or 'difdop', but not sure this is actually needed
-        integopt = output_shift.integopt[ifreq]
-        # fig, ax = plt.subplots()
-        plot_gola(beami, ax=ax, color='k', lw=2)
-        if lab == 0:
-            plot_beam(beam, dif, beami, ax=ax, central_ray=True, other_rays=False, color='blue')
-            lab = 1
-        else:
-            plot_beam(beam, dif, beami, ax=ax, central_ray=True, other_rays=False, color='blue')
-        #plot_beam(beam, dif, beami, ax=ax, central_ray=False, other_rays=True, color='silver', alpha=0.5, lw=0.5)
-    lab = 0
-    ax.legend(loc = 4)
-    ax.set_xlabel('R [m]')
-    ax.set_ylabel('z [m]')
-    ax.set_xlim(2.8, 3.1)
-    ax.set_ylim(-0.1, 0.25)
-
 # %%
 if __name__ == '__main__':
-    fig, ax = plt.subplots(figsize = (8,8))
-    time = int(np.mean(twindow))
+    machine, shot, sweep, drho,  modex, channelval = 'west', 58108, 18, -0.024, 0, 1
+    angle_choice, user = 'ver', 'FO'  #these variables are optional
+    output_3, interface_3= custom_beam3d(machine, shot, sweep, drho,  modex, channelval, twindow = None, flag = 0, verbose = True)
 
-    polview(shot, time, ax=ax, colors='r')
-
-# %%
-from DBS.io.read import read_angle_pol
-
-#%%
-if __name__ == '__main__':
-    fig, ax = plt.subplots()
-    for use_inclinometer, lab in zip([True, False], ['inclinometer', 'verin']):    
-        t,y = read_angle_pol('west', 58333, use_inclinometer=use_inclinometer)
-        ax.plot(t,y, label=lab); ax.legend(); ax.set_xlabel('time [s]'); ax.set_ylabel('poloidal angle [deg]')
-    
 
 # %%
