@@ -19,7 +19,7 @@ from scipy.interpolate import interpn
 # from abc import ABC, abstractmethod
 from matlabtools import Struct
 
-class equilibrium():
+class Equilibrium(Struct):
     
     def __init__(self, shot, t_start):
         t_ignitron = tsmat(shot, 'IGNITRON|1')[0]
@@ -39,14 +39,15 @@ class equilibrium():
         
         #magnetic field 
         Bpol = np.sqrt( np.squeeze(equi.interp2D.b_field_r[ind_efit, :, :])**2 + np.squeeze(equi.interp2D.b_field_z[ind_efit, :, :])**2 )
-        Bpol[np.isnan(Bpol)] = 0
         Btot = np.sqrt( np.squeeze(equi.interp2D.b_field_tor[ind_efit, :, :])**2 + np.squeeze(equi.interp2D.b_field_r[ind_efit, :, :])**2 + np.squeeze(equi.interp2D.b_field_z[ind_efit, :, :])**2 )
-        Btot[np.isnan(Btot)] = 0
-        Br = np.squeeze(equi.interp2D.b_field_r[ind_efit, :, :])
-        Br[np.isnan(Br)] = 0
-        Bz = np.squeeze(equi.interp2D.b_field_z[ind_efit, :, :])
-        Bz[np.isnan(Bz)] = 0
+        Br   = np.squeeze(equi.interp2D.b_field_r[ind_efit, :, :])
+        Bz   = np.squeeze(equi.interp2D.b_field_z[ind_efit, :, :])
         Btor = np.squeeze(equi.interp2D.b_field_tor[ind_efit, :, :])
+
+        Bpol[np.isnan(Bpol)] = 0
+        Btot[np.isnan(Btot)] = 0
+        Br[np.isnan(Br)]     = 0
+        Bz[np.isnan(Bz)]     = 0
         Btor[np.isnan(Btor)] = 0
         
         #fist psi 
@@ -55,70 +56,79 @@ class equilibrium():
         psibound = equi.global_quantities.psi_boundary[ind_efit]*a
         psi = np.squeeze(equi.interp2D.psi[ind_efit, :, :])*a
         
-        header_txt = f'Equilibrium for shot {shot} at time {t_start}'
-        equi = dict({'header':header_txt,\
-            'shot':shot, 'time':time, 'ind_efit':ind_efit, 't_ignitron':t_ignitron, \
-            'Rmag':Rmag, 'Zmag':Zmag, 'rgrid':rgrid, 'zgrid':zgrid, 'Rsep':Rsep, 'Zsep':Zsep, \
-            'Bpol':Bpol, 'Btor':Btor, 'Br':Br, 'Bz':Bz, 'Btot':Btot, \
-            'psiaxis':psiaxis, 'psibound':psibound, 'psi':psi, 'rhobord':rho_bord
-        })
-        
-        
-        self.equi    = equi
-        self.shot    = shot
-        self.t_start = t_start
+        self.description = f'Equilibrium for shot {shot} at time {t_start}'
+        self.shot        = shot
+        self.t_start     = t_start
+        self.time        = time 
+        self.ind_efit    = ind_efit
+        self.t_ignitron  = t_ignitron
+        self.Rmag        = Rmag
+        self.Zmag        = Zmag
+        self.rgrid       = rgrid
+        self.zgrid       = zgrid
+        self.Rsep        = Rsep
+        self.Zsep        = Zsep
+        self.Bpol        = Bpol
+        self.Btor        = Btor
+        self.Br          = Br
+        self.Bz          = Bz
+        self.Btot        = Btot
+        self.psiaxis     = psiaxis
+        self.psibound    = psibound
+        self.psi         = psi
+        self.rho_bord    = rho_bord
 
+    @classmethod
+    def get_equi(cls, shot, t_start):
         
-    def get_equi(self):
-        
-        equi = self.equi
+        plasma = Equilibrium( shot, t_start)
         
         #remove nan from psi 
-        i, j, k, l = 0, equi['rgrid'].size -1 , 0, equi['zgrid'].size -1
-        while (np.sum(np.isnan(equi['psi'][i:j+1, k:l+1])) != 0):
+        i, j, k, l = 0, plasma.rgrid.size -1 , 0, plasma.zgrid.size -1
+        while (np.sum(np.isnan(plasma.psi[i:j+1, k:l+1])) != 0):
             i, j, k, l = i+1, j-1, k+1, l-1
         ind1, ind2 = np.arange(i, j+1), np.arange(k, l+1)
-        equi['rgrid2'] = equi['rgrid'][ind1]
-        equi['zgrid2'] = equi['zgrid'][ind2]
-        psi2 = equi['psi'][(ind1[0]):(ind1[-1] + 1), (ind2[0]):(ind2[-1] + 1)]
-        equi['psi2'] = psi2.flatten('K')
+        plasma.rgrid2 = plasma.rgrid[ind1]
+        plasma.zgrid2 = plasma.zgrid[ind2]
+        psi2 = plasma.psi[(ind1[0]):(ind1[-1] + 1), (ind2[0]):(ind2[-1] + 1)]
+        plasma.psi2 = psi2.flatten('K')
         
         #creating the mesh for the interpolation
-        Psi2 = np.reshape(equi['psi2'], [equi['rgrid2'].size, equi['zgrid2'].size]).T
-        Rgrid2, Zgrid2 = np.meshgrid(equi['rgrid2'], equi['zgrid2'], indexing='ij')
-        Rgrid3, Zgrid3 = np.meshgrid(equi['rgrid'], equi['zgrid'], indexing = 'ij')
+        Psi2 = np.reshape(plasma.psi2, [plasma.rgrid2.size, plasma.zgrid2.size]).T
+        Rgrid2, Zgrid2 = np.meshgrid(plasma.rgrid2, plasma.zgrid2, indexing='ij')
+        Rgrid3, Zgrid3 = np.meshgrid(plasma.rgrid, plasma.zgrid, indexing = 'ij')
         
         #interpolation 
-        points = (equi['rgrid2'], equi['zgrid2'])
-        psi = np.zeros([equi['rgrid'].size, equi['zgrid'].size])
-        for i in range(0, equi['rgrid'].size):
-            for j in range(0, equi['zgrid'].size):  
+        points = (plasma.rgrid2, plasma.zgrid2)
+        psi = np.zeros([plasma.rgrid.size, plasma.zgrid.size])
+        for i in range(0, plasma.rgrid.size):
+            for j in range(0, plasma.zgrid.size):  
                 psi[i,j] = interpn(points, Psi2, np.array([Rgrid3[i,0], Zgrid3[0,j]]), method = 'linear', bounds_error = False, fill_value = None)
 
         psi = psi.flatten('K')
-        equi['psi'] = psi.reshape(equi['rgrid'].size, equi['zgrid'].size)
+        plasma.psi = psi.reshape(plasma.rgrid.size, plasma.zgrid.size)
         
-        rgrid2, zgrid2 = np.meshgrid(equi['rgrid'], equi['zgrid'])
-        rgrid2fin, zgrid2fin = np.meshgrid(np.linspace(equi['rgrid'].min(), equi['rgrid'].max(), 200), np.linspace(equi['zgrid'].min(), equi['zgrid'].max(), 200))
+        rgrid2, zgrid2 = np.meshgrid(plasma.rgrid, plasma.zgrid)
+        rgrid2fin, zgrid2fin = np.meshgrid(np.linspace(plasma.rgrid.min(), plasma.rgrid.max(), 200), np.linspace(plasma.zgrid.min(), plasma.zgrid.max(), 200))
 
         psifin = np.zeros([rgrid2fin.shape[0], zgrid2fin.shape[0]])
         points2 = (rgrid2[0,:], zgrid2[:,0])
 
         for i in range(0, rgrid2fin.shape[0]):
             for j in range(0, zgrid2fin.shape[0]):
-                psifin[i,j] = interpn(points2, equi['psi'], np.array([rgrid2fin[0,i], zgrid2fin[j,0]]), method = 'splinef2d')
+                psifin[i,j] = interpn(points2, plasma.psi, np.array([rgrid2fin[0,i], zgrid2fin[j,0]]), method = 'splinef2d')
                 
                 
-        rmax = equi['Rsep'].max()
-        rmin = equi['Rsep'].min()
-        zmax = equi['Zsep'].max()
-        zmin = equi['Zsep'].min()
+        rmax = plasma.Rsep.max()
+        rmin = plasma.Rsep.min()
+        zmax = plasma.Zsep.max()
+        zmin = plasma.Zsep.min()
         rr0 = (rmin+rmax)/2*100
         a03 = (rmax-rmin)/2*100
         zpos = (zmin + zmax)/2*100
         elong = (zmax - zmin)/(rmax - rmin)
         psi0 = (psifin.max()).max()
-        psi1 = equi['psibound']
+        psi1 = plasma.psibound
         dsha0 = rgrid2fin[psifin >= psi0].mean()*100 - rr0
         rhod = np.arange(0.1, 1, 0.1)
 
@@ -128,19 +138,21 @@ class equilibrium():
     
         dshap = np.real(np.mean(np.log(1-dsha/dsha0)/np.log(rhod)))
         
-        plasma = equi
-        plasma['rr0'], plasma['a03'], plasma['zpos'], plasma['elong'] = rr0, a03, zpos, elong
-        plasma['dsha0'], plasma['dsha'], plasma['dshap'] = dsha0, dsha, dshap
+        plasma.rr0    = rr0
+        plasma.a03    = a03
+        plasma.zpos   = zpos
+        plasma.elong  = elong
+        plasma.dsha0  = dsha0
+        plasma.dsha  = dsha
+        plasma.dshap = dshap
+        plasma.psifin = psifin
         
-        self.plasma = plasma 
-        return plasma 
+        return plasma
         
 # %%
 if __name__ == '__main__':
     
-    equilbr = equilibrium(57558, 7.6005)
-    plasma = equilbr.get_equi()
-
+    plasma = Equilibrium.get_equi(57558, 7.7)
 
 
 # %%
