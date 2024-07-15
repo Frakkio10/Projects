@@ -19,6 +19,32 @@ from scipy.interpolate import interpn
 # from abc import ABC, abstractmethod
 from matlabtools import Struct
 
+class WEST_wall(Struct):
+    
+    def __init__(self, shot):
+        wall = imas_west.get(shot, 'wall')
+        r_wall = wall.description_2d[0].limiter.unit[0].outline.r
+        z_wall = wall.description_2d[0].limiter.unit[0].outline.z
+
+        r_wall = np.append(r_wall, r_wall[0])
+        z_wall = np.append(z_wall, z_wall[0])
+
+        self.shot = shot
+        self.r    = r_wall
+        self.z    = z_wall
+        
+    def plot(self, ax = None, label = False):
+        
+        if ax is None:
+            fig, ax = plt.subplots(figsize = (5, 5))
+        ax.plot(self.r, self.z, c = 'k', lw = 3)
+        if label:
+            ax.set_title(f'West discharge #{self.shot}')
+            ax.set_xlabel('R [m]', fontsize = 12)
+            ax.set_ylabel('Z [m]', fontsize = 12)
+        
+    
+    
 class Equilibrium(Struct):
     
     def __init__(self, shot, t_start):
@@ -36,6 +62,14 @@ class Equilibrium(Struct):
         zgrid = equi.interp2D.z[0,:]
         Rsep = equi.boundary.outline.r[ind_efit][0]
         Zsep = equi.boundary.outline.z[ind_efit][0]
+        rstrike = equi.boundary.strike_point.r[ind_efit]
+        zstrike = equi.boundary.strike_point.z[ind_efit]
+        rxpoint = equi.boundary.x_point.r[ind_efit]
+        zxpoint = equi.boundary.x_point.z[ind_efit]
+        rmagaxi = equi.boundary.geometric_axis.r[ind_efit]
+        zmagaxi = equi.boundary.geometric_axis.z[ind_efit]
+        R0      = equi.vacuum_toroidal_field.r0
+        B0      = equi.vacuum_toroidal_field.b0[ind_efit]
         
         #magnetic field 
         Bpol = np.sqrt( np.squeeze(equi.interp2D.b_field_r[ind_efit, :, :])**2 + np.squeeze(equi.interp2D.b_field_z[ind_efit, :, :])**2 )
@@ -77,6 +111,14 @@ class Equilibrium(Struct):
         self.psibound    = psibound
         self.psi         = psi
         self.rho_bord    = rho_bord
+        self.rstrike     = rstrike
+        self.zstrike     = zstrike        
+        self.rxpoint     = rxpoint
+        self.zxpoint     = zxpoint        
+        self.rmagaxi     = rmagaxi
+        self.zmagaxi     = zmagaxi
+        self.R0          = R0
+        self.B0          = B0
 
     @classmethod
     def get_equi(cls, shot, t_start):
@@ -148,11 +190,52 @@ class Equilibrium(Struct):
         plasma.psifin = psifin
         
         return plasma
-        
-# %%
-if __name__ == '__main__':
     
+    def plot(self, shot, t_start, ax = None):
+        
+        
+        wall = WEST_wall(shot)
+        plasma = self.get_equi(shot, t_start)
+        rho_psi = np.sqrt((plasma.psi - plasma.psiaxis) / (plasma.psibound - plasma.psiaxis))
+        x,y = plasma.rgrid, plasma.zgrid
+        
+        if ax is None:
+            fig, ax = plt.subplots(figsize = (7, 8))
+        
+        ax.set_title(r't = %d s -- $B_0$ = %.2f T -- $R_0$ = %.2f m' %(plasma.t_start, plasma.B0, plasma.R0), fontsize = 18)
+        im = ax.contour(x, y, rho_psi.T, colors = 'k', levels = [0.2, 0.3, 0.4, 0.6, 0.7, 0.8, 0.9, 1], linestyles = '-', origin='lower')
+        im = ax.contour(x, y, rho_psi.T, colors = 'k', levels = [1.2], linestyles = '--', origin='lower')
+        contour = ax.contour(x, y, rho_psi.T, colors = 'k', levels = [1.1], linestyles = '--', origin='lower')
+        ax.clabel(contour, inline=True, fontsize=10, fmt="%.1f")
+
+        contour = ax.contour(x, y, rho_psi.T, colors = 'k', levels = [0.5], linestyles = '-', origin='lower')
+        ax.clabel(contour, inline=True, fontsize=10, fmt="%.1f")
+
+        #im = ax.contour(x, y, rho_psi.T, colors = 'r', levels = [1], linestyles = '-', origin='lower')
+        ax.plot(plasma.Rsep, plasma.Zsep, '--r', lw = 2)
+        ax.plot(wall.r, wall.z, 'k', lw = 3)
+        ax.plot(plasma.rstrike, plasma.zstrike, 'xr', markersize = 20)
+        ax.plot(plasma.rxpoint, plasma.zxpoint, 'xk', markersize = 20)
+       # ax.plot(plasma.rmagaxi, plasma.zmagaxi, '+k', markersize = 20)
+        
+        ax.set_xlabel('R [m]', fontsize = 12)
+        ax.set_ylabel('Z [m]', fontsize = 12)
+        fig.show()
+        #return rho_psi
+# %% 
+if __name__ == '__main__':
     plasma = Equilibrium.get_equi(57558, 7.7)
 
-
+# %%
+if __name__ == '__main__':
+    shots = [58333, 57558, 58108, 60269]
+    t_start = [20, 6, 10, 7]
+    
+    for shot, ti in zip(shots, t_start):
+        equi = Equilibrium(shot, ti)
+        equi.plot(shot, ti)
+        plt.show()
+# %%
+if __name__ == '__main__':
+    wall = WEST_wall(57558)
 # %%
