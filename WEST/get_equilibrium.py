@@ -215,8 +215,7 @@ class Equilibrium(Struct):
             idx = np.argmax(plasma.Zsep)
         else:
             idx = np.argmin(plasma.Zsep)
-    
-        #im = ax.contour(x, y, rho_psi.T, colors = 'r', levels = [1], linestyles = '-', origin='lower')
+            
         ax.plot(plasma.Rsep, plasma.Zsep, '--r', lw = 2)
         plt.plot([plasma.Rsep[idx], plasma.rstrike[0]], [plasma.Zsep[idx], plasma.zstrike[0]], 'r--', lw = 2)
         plt.plot([plasma.Rsep[idx], plasma.rstrike[1]], [plasma.Zsep[idx], plasma.zstrike[1]], 'r--', lw = 2)
