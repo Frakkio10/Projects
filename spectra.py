@@ -67,8 +67,8 @@ ax.set_xlabel('f [MHz]')
 ax.set_ylabel('PSD [dB]')
 ax.legend(loc = 'center left', bbox_to_anchor = (0.8, 0.5))
 ax.grid(c = 'silver', ls ='--', lw = 0.5)
-plt.savefig('/Home/FO278650/Bureau/Analysis/spectra/FO60269_12.pdf')
-plt.savefig('/Home/FO278650/Bureau/Analysis/spectra/FO60269_12.jpg')
+#plt.savefig('/Home/FO278650/Bureau/Analysis/spectra/FO60269_12.pdf')
+#plt.savefig('/Home/FO278650/Bureau/Analysis/spectra/FO60269_12.jpg')
 # %%
 
 def spectra(machine, shot, channelval, isweep):
