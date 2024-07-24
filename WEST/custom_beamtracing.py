@@ -3,6 +3,7 @@ import numpy as np
 from DBS import definitions as defs
 from DBS.beamtracing import Equilibrium2d, DensityProf1d, Beam3dInterface, DIFDOP, TCVDUALV 
 from DBS.beamtracing.custom.reflectometers_v1 import DREFRAP
+from DBS.beamtracing.interface import Beam3dInterface
 import matplotlib.pyplot as plt
 from DBS.io.interface import DataInterface
 from DBS.beamtracing.src.west.io import retreive_west_density_data, retrieve_west_eq
@@ -12,6 +13,7 @@ from DBS.beamtracing.src.visualize import plot_beam, plot_gola
 from pywest import polview
 from pathlib import Path
 from scipy.io import loadmat
+from DBS.beamtracing.src.visualize import plot_beam, plot_gola
 
 gnr_path_btr = "/Home/difdop/DBSdata/processed/beamtracing/west/{}_{}/ch{}_modex{}_isweep{}_{}_dr{}.mat"
 
@@ -33,19 +35,33 @@ def get_twindow(shot, isweep, channelval):
     twindow = twindow = [t0s[0].round(2), t0s[0].round(2) + dtStep]
     
     return np.mean(twindow), twindow
+
+def get_isweep(shot, twindow, channelval):
+    time = np.mean(twindow)
+    dataI = DataInterface.from_time(shot=shot, time=time, channelval=channelval, machine='west', verbose=False)
+    isweep = dataI.isweep
     
-def custom_beam3d(machine, shot, isweep, drho, modex, channelval, twindow = None, flag = 0, angle_choice = 'ver', user = 'FO', verbose = True):
+    return isweep
+    
+def custom_beam3d(machine, shot, drho, modex, channelval, isweep = None, twindow = None, flag = 0, angle_choice = 'ver', user = 'fe', verbose = True):
+
+    if twindow is None and isweep is None:
+        raise NotImplementedError('!! Either isweep or twindow must be specified, but none was given !!')
+    elif twindow is None:
+        dataI = DataInterface(shot, isweep, channelval, machine='west')
+        twindow = dataI.get_sweep_twindow().round(2)
+    elif isweep is None:
+        isweep = get_isweep(shot, twindow, channelval)
     
     outpath = gnr_path_btr.format(shot, user, channelval, modex, isweep, angle_choice,  str(float(drho)).split('.')[1])
-
-    if twindow is None:
-        time, twindow = get_twindow(shot, isweep, channelval)
+    if not Path(outpath).parent.exists():
+        Path(outpath).parent.mkdir(parents=True)
         
     #get density profiles and prepare the construct --> density profile averaged on the time interval of the iteration 
     print('Retrieving Density Data from DREFRAP', flush = True)
     nprof = DREFRAP(shot, flag = flag, drho = drho, twindow = twindow, verbose = True)
     data = nprof.get_ne(verbose=False, averaged=True)
-    densityprof = DensityProf1d(data['rho_psi'], data['ne'], data['drho'], data['ne_max'], data['R_max'], 'west', shot, twindow, description = data['header'])
+    densityprof = DensityProf1d(data['rho_psi'], data['ne'], 'west', shot, twindow, description = data['header'])
     plot_density(nprof, data)
 
     #retrieve or extract equi profiles and build the construct using the mean time from the time interval 
@@ -55,17 +71,16 @@ def custom_beam3d(machine, shot, isweep, drho, modex, channelval, twindow = None
     equilibrium = Equilibrium2d.from_shot(machine, shot, time) #reading from a file 
     
     #obtain info from difdop on the angle and asking the user which dt he wants to use for the angle 
-    print(time, twindow)
     print('Retrieving DIFDOP data', flush = True)
     dataI = DataInterface.from_time(shot, time, channelval, machine)
     t0s = dataI.get_start_time_of_freq_step()
     dtStep = 0.2
     
-    set_dt = input('Do you want to select a different dt for the angle? (y/n) Default dt = %.2f s' %(twindow[1] - twindow[0]))
-    if set_dt == 'y':
-        dtStep = float(input('dt to select (in s) : '))
-    elif set_dt == 'n':
-        dtStep = twindow[1] - twindow[0]
+    dtStep = input('Select a different dt for the angle? Default dt = %.2f s' %(twindow[1] - twindow[0]))
+    if dtStep == '':
+        dtStep = 0.2
+    elif float(dtStep):
+        dtStep = float(dtStep)
     else:
         print('!!Interrupting!!')
         return '', ''
@@ -117,15 +132,15 @@ def custom_beam3d(machine, shot, isweep, drho, modex, channelval, twindow = None
         interface.run_beam3d(outpath = outpath)
         outp = interface.fetch_result()
         
-
     return outp , interface
 
 
 # %%
 if __name__ == '__main__':
-    machine, shot, sweep, drho,  modex, channelval = 'west', 58108, 18, -0.024, 0, 1
+    machine, shot, sweep, drho,  modex, channelval = 'west', 57558, 19, 0, 1, 2
     angle_choice, user = 'ver', 'FO'  #these variables are optional
-    output_3, interface_3= custom_beam3d(machine, shot, sweep, drho,  modex, channelval, twindow = None, flag = 0, verbose = True)
+    output_3, interface_3 = custom_beam3d(machine, shot, drho, modex, channelval, isweep = None, twindow = [7.6, 7.8], flag = 0, user = user, verbose = True)
+
 
 
 # %%
